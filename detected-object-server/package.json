@@ -1,0 +1,21 @@
+{
+  "name": "detected-object-server",
+  "version": "1.0.0",
+  "description": "This is a server for processing images identified with a detected object in them",
+  "main": "index.js",
+  "scripts": {
+    "start": "node start.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Yordan Kunev",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.16.4",
+    "@babel/register": "7.4.0",
+    "@babel/core": "7.4.3",
+    "@babel/preset-env": "7.4.3",
+    "mongoose": "^5.5.5",
+    "body-parser": "^1.19.0",
+    "nodemailer": "^6.1.1"
+  }
+}
