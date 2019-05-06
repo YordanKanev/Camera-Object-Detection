@@ -14,6 +14,7 @@
     "http-errors": "~1.6.3",
     "morgan": "~1.9.1",
     "node-sass-middleware": "0.11.0",
-    "mongoose": "^5.5.5"
+    "mongoose": "^5.5.5",
+    "mongoose-bcrypt": "^1.6.0"
   }
 }
