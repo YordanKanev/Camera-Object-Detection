@@ -4,6 +4,17 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var sassMiddleware = require('node-sass-middleware');
+var mongoose = require('mongoose');
+var session = require('express-session');
+var config = require('./config');
+
+mongoose.connect(config.connectionString, {useNewUrlParser: true},function(err){
+    if(err){
+        console.log(err.message);
+    }
+});
+
+
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -17,6 +28,12 @@ app.set('view engine', 'ejs');
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(session({
+  secret: 'CameraObjectDetection',
+  cookie: {maxAge: 60*60*1000},
+  resave: false,
+  saveUninitialized: false
+}));
 app.use(cookieParser());
 app.use(sassMiddleware({
   src: path.join(__dirname, 'public'),
