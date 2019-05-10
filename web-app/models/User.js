@@ -1,3 +1,4 @@
+'use strict';
 var mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
@@ -10,9 +11,20 @@ const User = new Schema({
     email: {
         type: String,
         required: true
+    },
+    password: {
+        type: String,
+        required: true
     }
+
 });
 
 User.plugin(require('mongoose-bcrypt'));
 
-module.exports = new Schema('users', User);
+User.methods.toJSON = function () {
+    var user = this.toObject();
+    delete user.password;
+    return user;
+  }
+
+module.exports =  mongoose.model('users', User);

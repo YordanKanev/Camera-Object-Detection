@@ -8,6 +8,7 @@ var mongoose = require('mongoose');
 var session = require('express-session');
 var config = require('./config');
 
+mongoose.Promise = global.Promise;
 mongoose.connect(config.connectionString, {useNewUrlParser: true},function(err){
     if(err){
         console.log(err.message);
@@ -27,7 +28,7 @@ app.set('view engine', 'ejs');
 
 app.use(logger('dev'));
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 app.use(session({
   secret: 'CameraObjectDetection',
   cookie: {maxAge: 60*60*1000},

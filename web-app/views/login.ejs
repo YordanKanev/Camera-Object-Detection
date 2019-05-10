@@ -12,16 +12,34 @@
     <h1><%= title %></h1>
     <p>Welcome to <%= title %></p>
 
-    <form method="POST">
-        <div class="form-group">
-          <label for="exampleInputEmail1">Username</label>
-          <input type="username" class="form-control" id="exampleInputEmail1" placeholder="Enter username">
+    <form class="form-horizontal" action='' method="POST">
+      <fieldset>
+        <div id="legend">
+          <legend class="">Register</legend>
         </div>
-        <div class="form-group">
-          <label for="exampleInputPassword1">Password</label>
-          <input type="password" class="form-control" id="exampleInputPassword1" placeholder="Password">
+        <div class="control-group">
+          <!-- Username -->
+          <label class="control-label"  for="username">Username</label>
+          <div class="controls">
+            <input type="text" id="username" name="username" placeholder="" class="input-xlarge">
+          </div>
         </div>
-        <button type="submit" class="btn btn-primary">Submit</button>
+     
+        <div class="control-group">
+          <!-- Password-->
+          <label class="control-label" for="password">Password</label>
+          <div class="controls">
+            <input type="password" id="password" name="password" placeholder="" class="input-xlarge">
+          </div>
+        </div>
+     
+        <div class="control-group">
+          <!-- Button -->
+          <div class="controls">
+            <button class="btn btn-success">login</button>
+          </div>
+        </div>
+      </fieldset>
     </form>
   </body>
 </html>

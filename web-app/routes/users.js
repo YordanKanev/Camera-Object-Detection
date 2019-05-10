@@ -1,5 +1,6 @@
 var express = require('express');
 var router = express.Router();
+var userService = require("../services/user-service");
 
 
 function authenticate(req,res,next){
@@ -31,7 +32,14 @@ router.get('/login', navigate, function(req,res,next){
 });
 
 router.post('/login', function(req,res){
-
+    userService.login(req.body,function(err,user){
+      if(err){
+        res.redirect('/login');
+      }else{
+        req.session.user = user;
+        res.redirect('/manage');
+      }
+    })
 });
 
 router.get('/manage',authenticate, function(req,res){
@@ -43,7 +51,19 @@ router.get('/register',navigate, function(req,res){
 });
 
 router.post('/register',function(req,res){
-
+  var reqBody = req.body;
+  var userReq = {};
+  userReq.username = reqBody.username;
+  userReq.password= reqBody.password;
+  userReq.email = reqBody.email;
+  userService.register(userReq, function(err,user){
+    if(err){
+      res.status(400).json("Could not register");
+    }else{
+      req.session.user = user;
+      res.redirect('/manage');
+    }
+  });
 });
 
 module.exports = router;
