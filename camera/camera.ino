@@ -16,7 +16,10 @@
 
 const char* ssid = "TP-Link_E622";
 const char* password = "01743944";
-
+#define SENSOR GPIO_NUM_15
+#define BAUD_RATE 115200
+#define EXT_WAKEUP_PIN_BITMASK 0x1000  //  2^12
+#define MINIMUM_WAKE_PERIOD_MILLIS 60e3
 
 #if defined(CAMERA_MODEL_WROVER_KIT)
 #define PWDN_GPIO_NUM    -1
@@ -81,6 +84,12 @@ const char* password = "01743944";
 
 void startCameraServer();
 
+void motionDetected(){
+  Serial.println("Motion detected!");
+  delay(1000);
+}
+unsigned long lastWakeupPinHigh = 0;
+
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
@@ -143,8 +152,12 @@ void setup() {
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
   Serial.println("' to connect");
-}
 
+  pinMode(SENSOR, INPUT);
+  lastWakeupPinHigh = millis();
+  Serial.println("PIR ready");
+
+}
 
 void sendPhoto(camera_fb_t * fb, int dev_id) {
   if (WiFi.status()== WL_CONNECTED) {   //Check WiFi connection status
@@ -154,7 +167,9 @@ void sendPhoto(camera_fb_t * fb, int dev_id) {
     http.begin("http://192.168.0.101:9090/device/");  //Specify destination for HTTP request
     http.addHeader("Content-Type", "application/json");  //Specify content-type header
 
-    String payload = "{\"deviceId\" : \"id\",\"image\" : \"";
+    String payload = "{\"deviceId\" : \""; 
+    payload += dev_id;
+    payload += "\",\"image\" : \"";
     for (int i = 0; i<fb->len; i++) {
       payload += fb->buf[i];
     }
@@ -181,15 +196,37 @@ void sendPhoto(camera_fb_t * fb, int dev_id) {
 
 }
 
-void loop() {
-  delay(5000);
-  camera_fb_t * fb = esp_camera_fb_get();
-  if (!fb) {
-    ESP_LOGE(TAG, "Camera Capture Failed");
-  }
-  //replace this with your own function
-  sendPhoto(fb, 1);
+void gotoSleep(){
+  Serial.println("Deep sleep enabled");
+  esp_sleep_enable_ext0_wakeup(SENSOR, HIGH);
+  esp_deep_sleep_start();
+}
 
-  //return the frame buffer back to the driver for reuse
-  esp_camera_fb_return(fb);
+unsigned long secs() {
+  return millis() / 1e3L;
+}
+
+void loop() {
+  unsigned long now=millis();
+  int wakeupPinState=digitalRead(SENSOR);
+  if(wakeupPinState==HIGH){
+    lastWakeupPinHigh=now;
+    
+    camera_fb_t * fb = esp_camera_fb_get();
+    if (!fb) {
+      ESP_LOGE(TAG, "Camera Capture Failed");
+    }
+    //replace this with your own function
+    sendPhoto(fb, 1);
+
+    //return the frame buffer back to the driver for reuse
+    esp_camera_fb_return(fb);
+    
+  } else if(now-lastWakeupPinHigh >= MINIMUM_WAKE_PERIOD_MILLIS){
+      gotoSleep();
+  }
+  if(now % 2000 == 0){
+    Serial.printf("%u wakeupPinState %u \n", secs(), wakeupPinState);
+  }
+
 }

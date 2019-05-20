@@ -78,46 +78,6 @@ static ra_filter_t * ra_filter_init(ra_filter_t * filter, size_t sample_size){
     return filter;
 }
 
-
-  void sendPhoto2(camera_fb_t * fb, int dev_id){
-  if(WiFi.status()== WL_CONNECTED){   //Check WiFi connection status
- 
-   HTTPClient http;   
-
-   http.begin("http://192.168.0.101:9090/device/");  //Specify destination for HTTP request
-   http.addHeader("Content-Type", "application/json");             //Specify content-type header
-
-   String payload = "{\"deviceId\" : \"id\",\"image\" : \"";
-   for (int i =0; i<fb->len; i++){
-     payload += fb->buf[i];
-   } 
-   payload += "\"}";
-   int httpResponseCode = http.POST(payload);   //Send the actual POST request
-
-   if(httpResponseCode>0){
- 
-    String response = http.getString();                       //Get the response to the request
- 
-    Serial.println(httpResponseCode);   //Print return code
-    Serial.println(response);           //Print request answer
- 
-   }else{
- 
-    Serial.print("Error on sending POST: ");
-    Serial.println(httpResponseCode);
- 
-   }
- 
-   http.end();  //Free resources
- 
- }else{
- 
-    Serial.println("Error in WiFi connection");   
- 
- }
- 
-}
-
 static int ra_filter_run(ra_filter_t * filter, int value){
     if(!filter->values){
         return value;
