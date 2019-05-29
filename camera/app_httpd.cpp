@@ -24,6 +24,8 @@
 #include "fr_forward.h"
 
 #include <HTTPClient.h>
+#include <base64.h>
+#include <WiFi.h>
 
 #define ENROLL_CONFIRM_TIMES 5
 #define FACE_ID_SAVE_NUMBER 7
@@ -36,6 +38,9 @@
 #define FACE_COLOR_YELLOW (FACE_COLOR_RED | FACE_COLOR_GREEN)
 #define FACE_COLOR_CYAN   (FACE_COLOR_BLUE | FACE_COLOR_GREEN)
 #define FACE_COLOR_PURPLE (FACE_COLOR_BLUE | FACE_COLOR_RED)
+
+typedef void (*functiontype)(camera_fb_t * fb, int dev_id);
+functiontype sendPhotoGlobal = NULL;
 
 typedef struct {
         size_t size; //number of values used for filtering
@@ -219,6 +224,7 @@ static size_t jpg_encode_stream(void * arg, size_t index, const void* data, size
 }
 
 static esp_err_t capture_handler(httpd_req_t *req){
+    Serial.println("It works"); 
     camera_fb_t * fb = NULL;
     esp_err_t res = ESP_OK;
     int64_t fr_start = esp_timer_get_time();
@@ -329,8 +335,9 @@ static esp_err_t stream_handler(httpd_req_t *req){
     if(res != ESP_OK){
         return res;
     }
-
+  
     while(true){
+        Serial.println("while(true)");
         detected = false;
         face_id = 0;
         fb = esp_camera_fb_get();
@@ -357,7 +364,7 @@ static esp_err_t stream_handler(httpd_req_t *req){
                     _jpg_buf = fb->buf;
                 }
             } else {
-
+              Serial.println("image matrix");
                 image_matrix = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
 
                 if (!image_matrix) {
@@ -368,16 +375,19 @@ static esp_err_t stream_handler(httpd_req_t *req){
                         Serial.println("fmt2rgb888 failed");
                         res = ESP_FAIL;
                     } else {
+                                    Serial.println("before detection enabled");
                         fr_ready = esp_timer_get_time();
                         box_array_t *net_boxes = NULL;
-                        if(detection_enabled){
+                        if (true){//detection_enabled){
                             net_boxes = face_detect(image_matrix, &mtmn_config);
                         }
                         fr_face = esp_timer_get_time();
                         fr_recognize = fr_face;
+                                                            Serial.println("before netboxes");
                         if (net_boxes || fb->format != PIXFORMAT_JPEG){
                             if(net_boxes){
                                 detected = true;
+                                sendPhotoGlobal(fb,1);
                                 if(recognition_enabled){
                                     face_id = run_face_recognition(image_matrix, net_boxes);
                                 }
@@ -583,7 +593,8 @@ static esp_err_t index_handler(httpd_req_t *req){
     return httpd_resp_send(req, (const char *)index_html_gz, index_html_gz_len);
 }
 
-void startCameraServer(){
+void startCameraServer(void(*sendPhoto)(camera_fb_t*, int)){
+    sendPhotoGlobal = sendPhoto;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     httpd_uri_t index_uri = {

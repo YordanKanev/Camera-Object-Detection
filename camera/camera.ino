@@ -3,6 +3,7 @@
 #include <HTTPClient.h>
 #include "esp_http_server.h"
 #include "esp_timer.h"
+#include <base64.h>
 
 //
 // WARNING!!! Make sure that you have either selected ESP32 Wrover Module,
@@ -14,8 +15,8 @@
 //#define CAMERA_MODEL_M5STACK_PSRAM
 #define CAMERA_MODEL_AI_THINKER
 
-const char* ssid = "TP-Link_E622";
-const char* password = "01743944";
+const char* ssid = "FMI-AIR-NEW";
+const char* password = "";
 #define SENSOR GPIO_NUM_15
 #define BAUD_RATE 115200
 #define EXT_WAKEUP_PIN_BITMASK 0x1000  //  2^12
@@ -82,7 +83,43 @@ const char* password = "01743944";
 #error "Camera model not selected"
 #endif
 
-void startCameraServer();
+
+void sendPhoto(camera_fb_t * fb, int dev_id) {
+  if (WiFi.status()== WL_CONNECTED) {   //Check WiFi connection status
+
+    HTTPClient http;
+    http.begin("https://exerceo.serveo.net/device/");  //Specify destination for HTTP request
+    http.addHeader("Content-Type", "application/json");  //Specify content-type header
+
+    String payload = "{\"deviceId\" : \""; 
+    payload += dev_id;
+    payload += "\",\"image\" : \"data:image/jpeg;base64,";
+    payload += base64::encode(fb->buf, fb->len);
+    payload += "\"}";
+    Serial.println("send");
+    int httpResponseCode = http.POST(payload);   //Send the actual POST request
+
+    if (httpResponseCode>0) {
+      String response = http.getString();                       //Get the response to the request
+
+      Serial.println(httpResponseCode);   //Print return code
+      Serial.println(response);           //Print request answer
+    
+    } else {
+      
+      Serial.print("Error on sending POST: ");
+      Serial.println(http.getString());
+      Serial.println(httpResponseCode);
+    }
+    http.end();  //Free resources
+  } else {
+    Serial.println("Error in WiFi connection");
+  }
+
+}
+
+
+void startCameraServer(void(*sendPhoto)(camera_fb_t*, int));
 
 void motionDetected(){
   Serial.println("Motion detected!");
@@ -147,7 +184,7 @@ void setup() {
   Serial.println("");
   Serial.println("WiFi connected");
 
-  startCameraServer();
+  startCameraServer(sendPhoto);
 
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
@@ -156,49 +193,14 @@ void setup() {
   pinMode(SENSOR, INPUT);
   lastWakeupPinHigh = millis();
   Serial.println("PIR ready");
-
-}
-
-void sendPhoto(camera_fb_t * fb, int dev_id) {
-  if (WiFi.status()== WL_CONNECTED) {   //Check WiFi connection status
-
-    HTTPClient http;
-
-    http.begin("http://192.168.0.101:9090/device/");  //Specify destination for HTTP request
-    http.addHeader("Content-Type", "application/json");  //Specify content-type header
-
-    String payload = "{\"deviceId\" : \""; 
-    payload += dev_id;
-    payload += "\",\"image\" : \"";
-    for (int i = 0; i<fb->len; i++) {
-      payload += fb->buf[i];
-    }
-    payload += "\"}";
-    Serial.println(payload);
-    Serial.println(payload[34]);
-    int httpResponseCode = http.POST(payload);   //Send the actual POST request
-
-    if (httpResponseCode>0) {
-      String response = http.getString();                       //Get the response to the request
-
-      Serial.println(httpResponseCode);   //Print return code
-      Serial.println(response);           //Print request answer
-    
-    } else {
-      
-      Serial.print("Error on sending POST: ");
-      Serial.println(httpResponseCode);
-    }
-    http.end();  //Free resources
-  } else {
-    Serial.println("Error in WiFi connection");
-  }
-
+  HTTPClient http;
+  http.begin("http://10.108.4.88/stream");  //Specify destination for HTTP request
+  int httpResponseCode = http.GET();   //Send the actual POST request 
 }
 
 void gotoSleep(){
   Serial.println("Deep sleep enabled");
-  esp_sleep_enable_ext0_wakeup(SENSOR, HIGH);
+  (SENSOR, HIGH);
   esp_deep_sleep_start();
 }
 
@@ -206,27 +208,33 @@ unsigned long secs() {
   return millis() / 1e3L;
 }
 
-void loop() {
-  unsigned long now=millis();
-  int wakeupPinState=digitalRead(SENSOR);
-  if(wakeupPinState==HIGH){
-    lastWakeupPinHigh=now;
-    
-    camera_fb_t * fb = esp_camera_fb_get();
-    if (!fb) {
-      ESP_LOGE(TAG, "Camera Capture Failed");
-    }
-    //replace this with your own function
-    sendPhoto(fb, 1);
 
-    //return the frame buffer back to the driver for reuse
-    esp_camera_fb_return(fb);
-    
-  } else if(now-lastWakeupPinHigh >= MINIMUM_WAKE_PERIOD_MILLIS){
-      gotoSleep();
-  }
-  if(now % 2000 == 0){
-    Serial.printf("%u wakeupPinState %u \n", secs(), wakeupPinState);
-  }
+
+void loop() {
+ 
+
+//  delay(7000);
+//
+//   unsigned long now=millis();
+//   int wakeupPinState=digitalRead(SENSOR);
+//   if(wakeupPinState==HIGH){
+//     lastWakeupPinHigh=now;
+//   
+//     camera_fb_t * fb = esp_camera_fb_get();
+//     if (!fb) {
+//      ESP_LOGE(TAG, "Camera Capture Failed");
+//     }
+//     //replace this with your own function
+//     sendPhoto(fb, 1);
+//
+//     //return the frame buffer back to the driver for reuse
+//     esp_camera_fb_return(fb);
+//    
+//   } else if(now-lastWakeupPinHigh >= MINIMUM_WAKE_PERIOD_MILLIS){
+//       gotoSleep();
+//   }
+//   if(now % 2000 == 0){
+//     Serial.printf("%u wakeupPinState %u \n", secs(), wakeupPinState);
+//  }
 
 }
