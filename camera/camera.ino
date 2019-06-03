@@ -2,7 +2,6 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <base64.h>
-#include "esp_http_server.h"
 #include "esp_timer.h"
 #include "img_converters.h"
 #include "camera_index.h"
@@ -23,8 +22,9 @@
 //#define CAMERA_MODEL_M5STACK_PSRAM
 #define CAMERA_MODEL_AI_THINKER
 
-const char *ssid = "FMI-AIR-NEW";
-const char *password = "";
+const char* ssid = "ssid";
+const char* password = "password";
+
 #define SENSOR GPIO_NUM_15
 #define BAUD_RATE 115200
 #define EXT_WAKEUP_PIN_BITMASK 0x1000 //  2^12
@@ -96,40 +96,33 @@ static const char* _STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" 
 static const char* _STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 
-static mtmn_config_t mtmn_config = {0};
+static mtmn_config_t mtmn_config = { 0 };
 
 static int8_t detection_enabled = 1;
 static int8_t recognition_enabled = 0;
 static int8_t is_enrolling = 0;
-static face_id_list id_list = {0};
+static face_id_list id_list = { 0 };
 
-void startCameraServer();
-
-void motionDetected()
-{
-  Serial.println("Motion detected!");
-  delay(1000);
-}
 unsigned long lastWakeupPinHigh = 0;
+bool motionDetected = false;
 
 camera_fb_t *fb = NULL;
-  esp_err_t res = ESP_OK;
-  size_t _jpg_buf_len = 0;
-  uint8_t *_jpg_buf = NULL;
-  char *part_buf[64];
-  dl_matrix3du_t *image_matrix = NULL;
-  bool detected = false;
-  int face_id = 0;
-  int64_t fr_start = 0;
-  int64_t fr_ready = 0;
-  int64_t fr_face = 0;
-  int64_t fr_recognize = 0;
-  int64_t fr_encode = 0;
+esp_err_t res = ESP_OK;
+size_t _jpg_buf_len = 0;
+uint8_t *_jpg_buf = NULL;
+char *part_buf[64];
+dl_matrix3du_t *image_matrix = NULL;
+bool detected = false;
+int face_id = 0;
+int64_t fr_start = 0;
+int64_t fr_ready = 0;
+int64_t fr_face = 0;
+int64_t fr_recognize = 0;
+int64_t fr_encode = 0;
 
-  static int64_t last_frame = 0;
+static int64_t last_frame = 0;
 
-void setup()
-{
+void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
@@ -157,25 +150,22 @@ void setup()
   config.pixel_format = PIXFORMAT_JPEG;
 
   mtmn_config.min_face = 80;
-    mtmn_config.pyramid = 0.7;
-    mtmn_config.p_threshold.score = 0.6;
-    mtmn_config.p_threshold.nms = 0.7;
-    mtmn_config.r_threshold.score = 0.7;
-    mtmn_config.r_threshold.nms = 0.7;
-    mtmn_config.r_threshold.candidate_number = 4;
-    mtmn_config.o_threshold.score = 0.7;
-    mtmn_config.o_threshold.nms = 0.4;
-    mtmn_config.o_threshold.candidate_number = 1;
-  
+  mtmn_config.pyramid = 0.7;
+  mtmn_config.p_threshold.score = 0.6;
+  mtmn_config.p_threshold.nms = 0.7;
+  mtmn_config.r_threshold.score = 0.7;
+  mtmn_config.r_threshold.nms = 0.7;
+  mtmn_config.r_threshold.candidate_number = 4;
+  mtmn_config.o_threshold.score = 0.7;
+  mtmn_config.o_threshold.nms = 0.4;
+  mtmn_config.o_threshold.candidate_number = 1;
+
   //init with high specs to pre-allocate larger buffers
-  if (psramFound())
-  {
+  if (psramFound()) {
     config.frame_size = FRAMESIZE_UXGA;
     config.jpeg_quality = 10;
     config.fb_count = 2;
-  }
-  else
-  {
+  } else {
     config.frame_size = FRAMESIZE_SVGA;
     config.jpeg_quality = 12;
     config.fb_count = 1;
@@ -183,8 +173,7 @@ void setup()
 
   // camera init
   esp_err_t err = esp_camera_init(&config);
-  if (err != ESP_OK)
-  {
+  if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
     return;
   }
@@ -195,34 +184,28 @@ void setup()
 
   WiFi.begin(ssid, password);
 
-  while (WiFi.status() != WL_CONNECTED)
-  {
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
   Serial.println("");
   Serial.println("WiFi connected");
 
-  startCameraServer();
 
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
+  Serial.print("Camera Ready!");
 
   pinMode(SENSOR, INPUT);
   lastWakeupPinHigh = millis();
   Serial.println("PIR ready");
 }
 
-void sendPhoto(camera_fb_t *fb, int dev_id)
-{
+void sendPhoto(camera_fb_t *fb, int dev_id) {
   Serial.println("hit send photo");
-  if (WiFi.status() == WL_CONNECTED)
-  { //Check WiFi connection status
+  if (WiFi.status() == WL_CONNECTED) { //Check WiFi connection status
 
     HTTPClient http;
 
-    http.begin("http://10.108.4.85:9090/device/");      //Specify destination for HTTP request
+    http.begin("http://192.168.0.101:9090/device/");      //Specify destination for HTTP request
     http.addHeader("Content-Type", "application/json"); //Specify content-type header
 
     String payload = "{\"deviceId\" : \"";
@@ -234,158 +217,137 @@ void sendPhoto(camera_fb_t *fb, int dev_id)
     Serial.println(payload[34]);
     int httpResponseCode = http.POST(payload); //Send the actual POST request
 
-    if (httpResponseCode > 0)
-    {
+    if (httpResponseCode > 0) {
       String response = http.getString(); //Get the response to the request
 
       Serial.println(httpResponseCode); //Print return code
       Serial.println(response);         //Print request answer
-    }
-    else
-    {
+    } else {
 
       Serial.print("Error on sending POST: ");
       Serial.println(httpResponseCode);
     }
     http.end(); //Free resources
-  }
-  else
-  {
+  } else {
     Serial.println("Error in WiFi connection");
   }
+  motionDetected = false;
 }
 
-void gotoSleep()
-{
+void gotoSleep() {
   Serial.println("Deep sleep enabled");
   esp_sleep_enable_ext0_wakeup(SENSOR, HIGH);
   esp_deep_sleep_start();
 }
 
-unsigned long secs()
-{
+unsigned long secs() {
   return millis() / 1e3L;
 }
 
-void startStream()
-{
-  
+unsigned long now = 0;
 
-  
-}
-void loop()
-{
-
-    detected = false;
-    face_id = 0;
-    fb = esp_camera_fb_get();
-    if (!fb)
-    {
-      Serial.println("Camera capture failed");
-      res = ESP_FAIL;
+void loop() {
+  if (!motionDetected) {
+    Serial.println("SENSOR");
+    unsigned long now = millis();
+    int wakeupPinState = digitalRead(SENSOR);
+    if (wakeupPinState==HIGH) {
+      lastWakeupPinHigh = now;
+      motionDetected = true;
+    } else if (now-lastWakeupPinHigh >= MINIMUM_WAKE_PERIOD_MILLIS) {
+      gotoSleep();
     }
-    else
-    {
-      Serial.println("Start looping");
-      fr_start = esp_timer_get_time();
-      fr_ready = fr_start;
-      fr_face = fr_start;
-      fr_encode = fr_start;
-      fr_recognize = fr_start;
-      if (!detection_enabled || fb->width > 400)
-      {
-        if (fb->format != PIXFORMAT_JPEG)
-        {
-          bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
-          esp_camera_fb_return(fb);
-          fb = NULL;
-          if (!jpeg_converted)
-          {
-            Serial.println("JPEG compression failed");
-            res = ESP_FAIL;
-          }
-        }
-        else
-        {
-          _jpg_buf_len = fb->len;
-          _jpg_buf = fb->buf;
-        }
-      }
-      else
-      {
-        Serial.println("before matrix alloc");
-        image_matrix = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
-
-        if (!image_matrix)
-        {
-          Serial.println("dl_matrix3du_alloc failed");
+    return;
+  }
+  if (millis()-now > MINIMUM_WAKE_PERIOD_MILLIS){
+    Serial.println("RESET SENSOR");
+    motionDetected = false;
+  }
+  detected = false;
+  face_id = 0;
+  fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    res = ESP_FAIL;
+  } else {
+    Serial.println("Start looping");
+    fr_start = esp_timer_get_time();
+    fr_ready = fr_start;
+    fr_face = fr_start;
+    fr_encode = fr_start;
+    fr_recognize = fr_start;
+    if (!detection_enabled || fb->width > 400) {
+      if (fb->format != PIXFORMAT_JPEG) {
+        bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
+        esp_camera_fb_return(fb);
+        fb = NULL;
+        if (!jpeg_converted) {
+          Serial.println("JPEG compression failed");
           res = ESP_FAIL;
         }
-        else
-        {
-          if (!fmt2rgb888(fb->buf, fb->len, fb->format, image_matrix->item))
-          {
-            Serial.println("fmt2rgb888 failed");
-            res = ESP_FAIL;
+      } else {
+        _jpg_buf_len = fb->len;
+        _jpg_buf = fb->buf;
+      }
+    } else {
+      Serial.println("before matrix alloc");
+      image_matrix = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
+
+      if (!image_matrix) {
+        Serial.println("dl_matrix3du_alloc failed");
+        res = ESP_FAIL;
+      } else {
+        if (!fmt2rgb888(fb->buf, fb->len, fb->format, image_matrix->item)) {
+          Serial.println("fmt2rgb888 failed");
+          res = ESP_FAIL;
+        } else {
+          fr_ready = esp_timer_get_time();
+          box_array_t *net_boxes = NULL;
+          Serial.println("before detection_enabled check");
+          if (detection_enabled) {
+            net_boxes = face_detect(image_matrix, &mtmn_config);
           }
-          else
-          {
-            fr_ready = esp_timer_get_time();
-            box_array_t *net_boxes = NULL;
-            Serial.println("before detection_enabled check");
-            if (detection_enabled)
-            {
-              net_boxes = face_detect(image_matrix, &mtmn_config);
-            }
-            Serial.println("after face detect");
-//            fr_face = esp_timer_get_time();
-//            fr_recognize = fr_face;
-            if (net_boxes || fb->format != PIXFORMAT_JPEG)
-            {
-              if (net_boxes)
+          Serial.println("after face detect");
+          //            fr_face = esp_timer_get_time();
+          //            fr_recognize = fr_face;
+          if (net_boxes || fb->format != PIXFORMAT_JPEG) {
+            if (net_boxes) {
+              Serial.println("in net_boxes");
+              detected = true;
+              sendPhoto(fb, 1);
+              /*if (recognition_enabled)
               {
-                Serial.println("in net_boxes");
-                detected = true;
-                sendPhoto(fb,1);
-                /*if (recognition_enabled)
-                {
-                  face_id = run_face_recognition(image_matrix, net_boxes);
-                }*/
-                fr_recognize = esp_timer_get_time();
-                //draw_face_boxes(image_matrix, net_boxes, face_id);
-                free(net_boxes->box);
-                free(net_boxes->landmark);
-                free(net_boxes);
-              }
-              if (!fmt2jpg(image_matrix->item, fb->width * fb->height * 3, fb->width, fb->height, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len))
-              {
-                Serial.println("fmt2jpg failed");
-                res = ESP_FAIL;
-              }
-              esp_camera_fb_return(fb);
-              fb = NULL;
+              face_id = run_face_recognition(image_matrix, net_boxes);
+              }*/
+              fr_recognize = esp_timer_get_time();
+              //draw_face_boxes(image_matrix, net_boxes, face_id);
+              free(net_boxes->box);
+              free(net_boxes->landmark);
+              free(net_boxes);
             }
-            else
-            {
-              _jpg_buf = fb->buf;
-              _jpg_buf_len = fb->len;
+            if (!fmt2jpg(image_matrix->item, fb->width * fb->height * 3, fb->width, fb->height, PIXFORMAT_RGB888, 90, &_jpg_buf, &_jpg_buf_len)) {
+              Serial.println("fmt2jpg failed");
+              res = ESP_FAIL;
             }
-            fr_encode = esp_timer_get_time();
+            esp_camera_fb_return(fb);
+            fb = NULL;
+          } else {
+            _jpg_buf = fb->buf;
+            _jpg_buf_len = fb->len;
           }
-          dl_matrix3du_free(image_matrix);
+          fr_encode = esp_timer_get_time();
         }
+        dl_matrix3du_free(image_matrix);
       }
     }
-    if (fb)
-    {
-      esp_camera_fb_return(fb);
-      fb = NULL;
-      _jpg_buf = NULL;
-    }
-    else if (_jpg_buf)
-    {
-      free(_jpg_buf);
-      _jpg_buf = NULL;
-    }
-    Serial.printf("Photo");
+  }
+  if (fb) {
+    esp_camera_fb_return(fb);
+    fb = NULL;
+    _jpg_buf = NULL;
+  } else if (_jpg_buf) {
+    free(_jpg_buf);
+    _jpg_buf = NULL;
+  }
+  Serial.printf("Photo");
 }
